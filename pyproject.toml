@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "drone-diffusion-brain"
+version = "0.1.0"
+description = "Diffusion Policy for autonomous multirotor flight"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "torch",
+    "numpy",
+    "omegaconf",
+    "tqdm",
+    "zarr",
+    "gymnasium",
+    "diffusers",
+    "gym-pybullet-drones @ git+https://github.com/utiasDSL/gym-pybullet-drones.git",
+    "kaddulive-blender-custom-drone-sim"
+]
+
+[tool.setuptools.packages.find]
+include = ["models*", "configs*", "dataset*"]
