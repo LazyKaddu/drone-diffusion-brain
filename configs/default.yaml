@@ -1,0 +1,96 @@
+# configs/default.yaml
+# Global Configuration for Drone Diffusion Policy Pipeline
+
+project:
+  name: "drone-diffusion-brain"
+  seed: 42
+  device: "cuda" # "cuda" or "cpu"
+
+env:
+  id: "CustomDrone-v0"
+  obs_type: "kin"              # "kin" (20-dim kinematics) or "rgb" (camera frames)
+  physics_hz: 240              # PyBullet physics simulation frequency
+  control_hz: 20               # Diffusion inference and replanning frequency (50ms interval)
+  gui: false
+
+data:
+  zarr_path: "data/expert_trajectories.zarr"
+  num_episodes: 2000           # Total trajectory rollouts to gather
+  max_episode_steps: 1000      # Max steps per rollout
+  val_split: 0.1
+  num_workers: 4
+  pin_memory: true
+
+policy:
+  # Temporal Horizons
+  obs_horizon: 1               # To: Number of past observation steps fed as condition
+  pred_horizon: 16             # Ta: Full action chunk length predicted by U-Net
+  exec_horizon: 4              # Te: Actions executed before re-planning (Receding Horizon)
+
+  # Dimensionality
+  action_dim: 4                # Collective Thrust, Roll rate, Pitch rate, Yaw rate
+  obs_dim: 20                  # [pos(3), quat(4), vel(3), ang_vel(3), motor_rpm(4), ...]
+
+  # Observation Conditioning Encoder
+  encoder:
+    type: "mlp"                # "mlp" for kinematics, "resnet18" for RGB
+    latent_dim: 256
+    hidden_dims: [128, 256]
+    activation: "Mish"
+
+  # 1D Temporal U-Net Backbone
+  unet:
+    down_dims: [128, 256, 512] # Feature channels per resolution level
+    kernel_size: 5             # Temporal receptive field per 1D conv
+    n_groups: 8                # GroupNorm groups
+    cond_dim: 256              # FiLM conditioning embedding dimension
+    diffusion_step_embed_dim: 128
+    dropout: 0.0
+
+  # Noise Schedulers (Hugging Face Diffusers)
+  diffusion:
+    train_scheduler:
+      type: "DDPMScheduler"
+      num_train_timesteps: 100
+      beta_start: 0.0001
+      beta_end: 0.02
+      beta_schedule: "squaredcos_cap_v2"
+      clip_sample: true
+      prediction_type: "epsilon"  # "epsilon" (noise) or "sample" (direct action)
+
+    inference_scheduler:
+      type: "DDIMScheduler"
+      num_inference_timesteps: 10 # 10 fast denoising steps (<50ms budget)
+      eta: 0.0                    # Deterministic sampling
+
+# Action & Observation Normalization Bounds
+normalization:
+  action:
+    min: [-1.0, -1.0, -1.0, -1.0] # Normalized lower bounds
+    max: [ 1.0,  1.0,  1.0,  1.0] # Normalized upper bounds
+  obs:
+    clip_min: -50.0
+    clip_max: 50.0
+
+training:
+  batch_size: 128
+  num_epochs: 300
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-6
+  lr_warmup_steps: 500
+  grad_clip_norm: 1.0
+
+  # Exponential Moving Average for weight stabilization
+  use_ema: true
+  ema_decay: 0.9999
+
+  # Logging & Checkpointing
+  log_interval: 100            # Iterations between console/wandb metric logging
+  save_interval: 20            # Epochs between model checkpoint dumps
+  checkpoint_dir: "checkpoints"
+  resume_checkpoint: null
+
+logging:
+  use_wandb: false
+  project_name: "drone-diffusion"
+  run_name: "kin-film-ta16-te4"
