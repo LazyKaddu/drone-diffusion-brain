@@ -1,9 +1,14 @@
 # models/encoder.py
 
+import os
 from typing import List, Optional, Union
 import torch
 import torch.nn as nn
 from torchvision import models
+from omegaconf import OmegaConf
+
+_config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "configs", "default.yaml")
+_default_cfg = OmegaConf.load(_config_path)
 
 
 class KinematicEncoder(nn.Module):
@@ -14,10 +19,10 @@ class KinematicEncoder(nn.Module):
 
     def __init__(
         self,
-        obs_dim: int = 20,
-        obs_horizon: int = 1,
-        latent_dim: int = 256,
-        hidden_dims: List[int] = [128, 256],
+        obs_dim: int = _default_cfg.policy.obs_dim,
+        obs_horizon: int = _default_cfg.policy.obs_horizon,
+        latent_dim: int = _default_cfg.policy.encoder.latent_dim,
+        hidden_dims: List[int] = _default_cfg.policy.encoder.hidden_dims,
         dropout: float = 0.0,
     ):
         super().__init__()
@@ -67,8 +72,8 @@ class VisualEncoder(nn.Module):
 
     def __init__(
         self,
-        obs_horizon: int = 1,
-        latent_dim: int = 256,
+        obs_horizon: int = _default_cfg.policy.obs_horizon,
+        latent_dim: int = _default_cfg.policy.encoder.latent_dim,
         pretrained: bool = False,
         replace_bn_with_gn: bool = True,
         in_channels: int = 3,
@@ -98,7 +103,7 @@ class VisualEncoder(nn.Module):
         # Extract feature extractor without standard classification FC
         self.backbone = nn.Sequential(
             backbone.conv1,
-            backbone.bn1 if not replace_bn_with_gn else backbone.conv1,  # Matches replaced GN
+            backbone.bn1,  # Matches replaced GN (it was already modified in-place)
             backbone.relu,
             backbone.maxpool,
             backbone.layer1,
@@ -152,9 +157,9 @@ class MultiModalEncoder(nn.Module):
 
     def __init__(
         self,
-        kin_dim: int = 20,
-        obs_horizon: int = 1,
-        latent_dim: int = 256,
+        kin_dim: int = _default_cfg.policy.obs_dim,
+        obs_horizon: int = _default_cfg.policy.obs_horizon,
+        latent_dim: int = _default_cfg.policy.encoder.latent_dim,
         visual_latent_dim: int = 128,
         kin_latent_dim: int = 128,
     ):

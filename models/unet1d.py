@@ -1,10 +1,15 @@
 # models/unet1d.py
 
 import math
+import os
 from typing import List, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from omegaconf import OmegaConf
+
+_config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "configs", "default.yaml")
+_default_cfg = OmegaConf.load(_config_path)
 
 
 class SinusoidalPosEmb(nn.Module):
@@ -157,14 +162,14 @@ class ConditionalUnet1D(nn.Module):
 
     def __init__(
         self,
-        action_dim: int = 4,
-        pred_horizon: int = 16,
-        cond_dim: int = 256,
-        diffusion_step_embed_dim: int = 128,
-        down_dims: List[int] = [128, 256, 512],
-        kernel_size: int = 5,
-        n_groups: int = 8,
-        dropout: float = 0.0,
+        action_dim: int = _default_cfg.policy.action_dim,
+        pred_horizon: int = _default_cfg.policy.pred_horizon,
+        cond_dim: int = _default_cfg.policy.unet.cond_dim,
+        diffusion_step_embed_dim: int = _default_cfg.policy.unet.diffusion_step_embed_dim,
+        down_dims: List[int] = _default_cfg.policy.unet.down_dims,
+        kernel_size: int = _default_cfg.policy.unet.kernel_size,
+        n_groups: int = _default_cfg.policy.unet.n_groups,
+        dropout: float = _default_cfg.policy.unet.dropout,
     ):
         super().__init__()
         self.action_dim = action_dim
@@ -311,6 +316,7 @@ class ConditionalUnet1D(nn.Module):
         x = self.mid_block2(x, global_cond)
 
         # 5. Upsampling path with skip concatenation
+        skips.pop()  # discard the bottom skip
         for upsample, (res1, res2) in zip(self.upsamples, self.up_blocks):
             skip = skips.pop()
             x = upsample(x)
