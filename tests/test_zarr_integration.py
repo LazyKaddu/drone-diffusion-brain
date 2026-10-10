@@ -7,6 +7,7 @@ import torch
 from omegaconf import OmegaConf
 
 from dataset.zarr_dataset import ZarrDataWriter, DroneZarrDataset, get_dataloaders
+from models.policy import DroneDiffusionPolicy
 
 
 def test_zarr_writer_and_reader():
@@ -14,8 +15,8 @@ def test_zarr_writer_and_reader():
     if os.path.exists(test_dir):
         shutil.rmtree(test_dir)
 
-    print("--- 1. Testing ZarrDataWriter ---")
-    obs_dim = 20
+    print("--- 1. Testing ZarrDataWriter (23-dim) ---")
+    obs_dim = 23
     action_dim = 4
     img_shape = (3, 224, 224)
 
@@ -42,11 +43,12 @@ def test_zarr_writer_and_reader():
     assert writer.total_steps == expected_total_steps, f"Expected {expected_total_steps} steps, got {writer.total_steps}"
     print(f"PASS: Writer stored {writer.total_episodes} episodes ({writer.total_steps} frames) successfully.")
 
-    print("\n--- 2. Testing DroneZarrDataset ---")
+    print("\n--- 2. Testing DroneZarrDataset (23-dim) ---")
     dataset = DroneZarrDataset(
         zarr_path=test_dir,
         obs_horizon=1,
         pred_horizon=16,
+        obs_dim=obs_dim,
         obs_type="kin",
     )
 
@@ -58,25 +60,12 @@ def test_zarr_writer_and_reader():
     print(f"PASS: DroneZarrDataset sample 0 has obs shape {sample['obs'].shape} and action shape {sample['action'].shape}")
 
     print("\n--- 3. Testing get_dataloaders factory ---")
-    mock_cfg = OmegaConf.create({
-        "project": {"seed": 42},
-        "data": {
-            "zarr_path": test_dir,
-            "val_split": 0.33,
-            "num_workers": 0,
-            "pin_memory": False,
-        },
-        "env": {"obs_type": "kin"},
-        "policy": {
-            "obs_horizon": 1,
-            "pred_horizon": 16,
-        },
-        "training": {
-            "batch_size": 16,
-        },
-    })
+    cfg = OmegaConf.load("configs/default.yaml")
+    # Temporarily point config to test dataset
+    cfg.data.zarr_path = test_dir
+    cfg.training.batch_size = 16
 
-    train_loader, val_loader, stats = get_dataloaders(mock_cfg)
+    train_loader, val_loader, stats = get_dataloaders(cfg)
     assert "obs" in stats and "action" in stats
     print(f"PASS: get_dataloaders returned {len(train_loader)} train batches, {len(val_loader)} val batches.")
 
@@ -85,9 +74,45 @@ def test_zarr_writer_and_reader():
     assert batch["action"].shape == (16, 16, action_dim), f"Batch action shape: {batch['action'].shape}"
     print(f"PASS: Dataloader yielded batch obs={batch['obs'].shape}, action={batch['action'].shape}")
 
+    print("\n--- 4. Testing DroneDiffusionPolicy compute_loss & predict_action ---")
+    device = torch.device("cpu")
+    cfg.project.device = "cpu"
+    policy = DroneDiffusionPolicy(cfg).to(device)
+
+    # Compute training loss
+    batch_dev = {
+        "obs": batch["obs"].to(device),
+        "action": batch["action"].to(device),
+    }
+    loss = policy.compute_loss(batch_dev)
+    assert torch.isfinite(loss), f"Loss is not finite: {loss.item()}"
+    print(f"PASS: policy.compute_loss succeeded with loss={loss.item():.4f}")
+
+    # Predict actions
+    with torch.no_grad():
+        pred_action = policy.predict_action(batch_dev["obs"][:2], num_inference_steps=2)
+        assert pred_action.shape == (2, 16, 4), f"Predicted action shape: {pred_action.shape}"
+        assert torch.all(pred_action >= -1.0) and torch.all(pred_action <= 1.0)
+    print(f"PASS: policy.predict_action succeeded with output shape {pred_action.shape}")
+
     # Clean up test zarr
     shutil.rmtree(test_dir)
-    print("\nAll integration tests PASSED successfully!")
+
+    print("\n--- 5. Testing Real Dataset data/expert_trajectories.zarr ---")
+    real_cfg = OmegaConf.load("configs/default.yaml")
+    real_cfg.data.zarr_path = "data/expert_trajectories.zarr"
+    if os.path.exists(real_cfg.data.zarr_path):
+        real_tl, real_vl, real_stats = get_dataloaders(real_cfg)
+        real_batch = next(iter(real_tl))
+        real_loss = policy.compute_loss({
+            "obs": real_batch["obs"].to(device),
+            "action": real_batch["action"].to(device),
+        })
+        print(f"PASS: Real dataset batch ({real_batch['obs'].shape}) loss computed: {real_loss.item():.4f}")
+    else:
+        print("Note: data/expert_trajectories.zarr not found, skipping real dataset test.")
+
+    print("\nALL INTEGRATION AND MODEL ALIGNMENT TESTS PASSED SUCCESSFULLY!")
 
 
 if __name__ == "__main__":

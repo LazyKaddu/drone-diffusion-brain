@@ -67,6 +67,13 @@ def load_deployment_policy(
     return policy, normalizer, cfg
 
 
+def format_kin_obs(kin: np.ndarray, obs_dim: int, target_pos: np.ndarray) -> np.ndarray:
+    """Appends target goal vector when expected obs_dim is 23."""
+    if obs_dim == 23 and len(kin) >= 20:
+        return np.hstack([kin[:20], target_pos]).astype(np.float32)
+    return kin[:obs_dim].astype(np.float32)
+
+
 def run_deployment_loop(
     checkpoint_path: str,
     gui: bool = True,
@@ -93,11 +100,12 @@ def run_deployment_loop(
 
     raw_obs, info = env.reset()
     current_kin = raw_obs["0"] if isinstance(raw_obs, dict) else raw_obs
+    target_pos = np.array([0.0, 0.0, 1.0], dtype=np.float32)
 
     # Observation FIFO buffer to maintain [To, obs_dim] history
     obs_queue = deque(maxlen=obs_horizon)
     for _ in range(obs_horizon):
-        obs_queue.append(current_kin)
+        obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos))
 
     # 2. GPU Warm-up (Compiles CUDA kernels and prevents latency spikes on step 0)
     print("[DEPLOY] Running GPU warm-up forward pass...")
@@ -156,7 +164,7 @@ def run_deployment_loop(
 
                 # Update state queue
                 current_kin = raw_obs["0"] if isinstance(raw_obs, dict) else raw_obs
-                obs_queue.append(current_kin)
+                obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos))
 
                 # Reset on crash or boundary breach
                 if terminated or truncated:
@@ -164,7 +172,7 @@ def run_deployment_loop(
                     raw_obs, info = env.reset()
                     current_kin = raw_obs["0"] if isinstance(raw_obs, dict) else raw_obs
                     for _ in range(obs_horizon):
-                        obs_queue.append(current_kin)
+                        obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos))
                     break
 
                 # Enforce consistent control cadence

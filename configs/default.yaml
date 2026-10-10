@@ -29,7 +29,7 @@ policy:
 
   # Dimensionality
   action_dim: 4                # Collective Thrust, Roll rate, Pitch rate, Yaw rate
-  obs_dim: 20                  # [pos(3), quat(4), vel(3), ang_vel(3), motor_rpm(4), ...]
+  obs_dim: 23                  # [pos(3), quat(4), vel(3), ang_vel(3), motor_rpm(4), goal(3)]
 
   # Observation Conditioning Encoder
   encoder:

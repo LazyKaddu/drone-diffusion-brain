@@ -63,6 +63,15 @@ def build_cosine_warmup_scheduler(
     return LambdaLR(optimizer, lr_lambda)
 
 
+def to_device(data, device: torch.device):
+    """Recursively transfers tensors or dictionaries of tensors to the specified device."""
+    if isinstance(data, torch.Tensor):
+        return data.to(device, non_blocking=True)
+    elif isinstance(data, dict):
+        return {k: to_device(v, device) for k, v in data.items()}
+    return data
+
+
 @torch.no_grad()
 def evaluate(policy: nn.Module, val_loader, device: torch.device) -> float:
     """
@@ -73,10 +82,10 @@ def evaluate(policy: nn.Module, val_loader, device: torch.device) -> float:
     num_batches = 0
 
     for batch in val_loader:
-        # Move tensors to device
+        # Move tensors to device (handles both tensors and multimodal dicts)
         batch_dev = {
-            "obs": batch["obs"].to(device, non_blocking=True),
-            "action": batch["action"].to(device, non_blocking=True),
+            "obs": to_device(batch["obs"], device),
+            "action": to_device(batch["action"], device),
         }
         loss = policy.compute_loss(batch_dev)
         total_val_loss += loss.item()
@@ -150,8 +159,8 @@ def train(cfg):
         pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1:03d}/{cfg.training.num_epochs:03d}")
         for batch in pbar:
             batch_dev = {
-                "obs": batch["obs"].to(device, non_blocking=True),
-                "action": batch["action"].to(device, non_blocking=True),
+                "obs": to_device(batch["obs"], device),
+                "action": to_device(batch["action"], device),
             }
 
             # Forward pass: sample random noise, add to action chunk, predict with U-Net
