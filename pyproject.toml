@@ -9,16 +9,18 @@ description = "Diffusion Policy for autonomous multirotor flight"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
+    "opencv-python",
     "torch",
     "torchvision",
     "numpy",
     "omegaconf",
     "tqdm",
-    "zarr",
+    "zarr<3.0.0",
+    "numcodecs>=0.10.0",
     "gymnasium",
     "diffusers",
     "gym-pybullet-drones @ git+https://github.com/utiasDSL/gym-pybullet-drones.git",
-    "kaddulive-blender-custom-drone-sim"
+    "kaddulive-blender-sim-env"
 ]
 
 [tool.setuptools.packages.find]
