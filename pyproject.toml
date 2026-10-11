@@ -30,3 +30,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["models*", "configs*", "dataset*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
