@@ -23,5 +23,14 @@ dependencies = [
     "kaddulive-blender-sim-env"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
 [tool.setuptools.packages.find]
 include = ["models*", "configs*", "dataset*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
