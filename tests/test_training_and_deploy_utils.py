@@ -1,11 +1,15 @@
-# tests/test_training_and_deploy_utils.py
-
 import math
+import sys
+from pathlib import Path
 import numpy as np
 import pytest
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from train import EMAModel, build_cosine_warmup_scheduler, to_device
 from deploy import RealTimeNormalizer, format_kin_obs

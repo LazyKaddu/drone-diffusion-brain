@@ -1,10 +1,15 @@
-# tests/conftest.py
-
 import os
+import sys
+from pathlib import Path
 import pytest
 import numpy as np
 import torch
 from omegaconf import OmegaConf
+
+# Ensure repository root containing train.py and deploy.py is in sys.path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from dataset.zarr_dataset import ZarrDataWriter
 
