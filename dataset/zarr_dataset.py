@@ -24,7 +24,7 @@ class ZarrDataWriter:
     def __init__(
         self,
         zarr_path: str,
-        obs_dim: int = 20,
+        obs_dim: int = 23,
         action_dim: int = 4,
         img_shape: Tuple[int, int, int] = (3, 224, 224),
         img_chunks: int = 500,
@@ -171,6 +171,7 @@ class DroneZarrDataset(Dataset):
         zarr_path: str,
         obs_horizon: int = 1,
         pred_horizon: int = 16,
+        obs_dim: Optional[int] = None,
         obs_type: str = "kin",
         episode_indices: Optional[List[int]] = None,
         stats: Optional[Dict[str, Dict[str, list]]] = None,
@@ -178,6 +179,7 @@ class DroneZarrDataset(Dataset):
         self.zarr_path = zarr_path
         self.obs_horizon = obs_horizon
         self.pred_horizon = pred_horizon
+        self.obs_dim = obs_dim
         self.obs_type = obs_type.lower()
 
         # Open Zarr archive read-only
@@ -219,6 +221,8 @@ class DroneZarrDataset(Dataset):
     def _compute_stats(self) -> Dict[str, Dict[str, list]]:
         """Computes min, max, range normalizer bounds across training trajectories."""
         obs_arr = self.obs_data[:]
+        if self.obs_dim is not None and obs_arr.shape[1] > self.obs_dim:
+            obs_arr = obs_arr[:, :self.obs_dim]
         act_arr = self.action_data[:]
 
         obs_min = np.min(obs_arr, axis=0)
@@ -254,6 +258,9 @@ class DroneZarrDataset(Dataset):
         obs_end = global_t + 1
 
         raw_obs = self.obs_data[obs_start:obs_end]  # [Len, obs_dim]
+        if self.obs_dim is not None and raw_obs.shape[1] > self.obs_dim:
+            raw_obs = raw_obs[:, :self.obs_dim]
+
         if len(raw_obs) < self.obs_horizon:
             pad_len = self.obs_horizon - len(raw_obs)
             pad = np.repeat(raw_obs[:1], pad_len, axis=0)
@@ -346,12 +353,14 @@ def get_dataloaders(cfg) -> Tuple[DataLoader, DataLoader, Dict[str, Dict[str, li
     obs_type = getattr(cfg.env, "obs_type", "kin")
     obs_horizon = cfg.policy.obs_horizon
     pred_horizon = cfg.policy.pred_horizon
+    obs_dim = getattr(cfg.policy, "obs_dim", None)
 
     # Build train dataset and derive normalizer bounds
     train_dataset = DroneZarrDataset(
         zarr_path=zarr_path,
         obs_horizon=obs_horizon,
         pred_horizon=pred_horizon,
+        obs_dim=obs_dim,
         obs_type=obs_type,
         episode_indices=train_ep_indices,
     )
@@ -361,6 +370,7 @@ def get_dataloaders(cfg) -> Tuple[DataLoader, DataLoader, Dict[str, Dict[str, li
         zarr_path=zarr_path,
         obs_horizon=obs_horizon,
         pred_horizon=pred_horizon,
+        obs_dim=obs_dim,
         obs_type=obs_type,
         episode_indices=val_ep_indices,
         stats=train_dataset.stats,

@@ -175,7 +175,13 @@ def collect_expert_trajectories(cfg):
                 computed_motor_rpms=computed_rpms,
             )
 
-            ep_obs.append(current_kin[:obs_dim].astype(np.float32))
+            # Include target goal coordinate vector if obs_dim is 23
+            if obs_dim == 23 and len(current_kin) >= 20:
+                full_kin = np.hstack([current_kin[:20], target_pos]).astype(np.float32)
+            else:
+                full_kin = current_kin[:obs_dim].astype(np.float32)
+
+            ep_obs.append(full_kin)
             ep_img.append(processed_img)
             ep_act.append(action)
 
