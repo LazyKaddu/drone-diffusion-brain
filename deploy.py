@@ -67,10 +67,16 @@ def load_deployment_policy(
     return policy, normalizer, cfg
 
 
-def format_kin_obs(kin: np.ndarray, obs_dim: int, target_pos: np.ndarray) -> np.ndarray:
-    """Appends target goal vector when expected obs_dim is 23."""
+def format_kin_obs(
+    kin: np.ndarray,
+    obs_dim: int,
+    target_pos: np.ndarray,
+    relative: bool = False,
+) -> np.ndarray:
+    """Appends target goal vector (relative or absolute) when expected obs_dim is 23."""
     if obs_dim == 23 and len(kin) >= 20:
-        return np.hstack([kin[:20], target_pos]).astype(np.float32)
+        goal_vec = (target_pos - kin[:3]) if relative else target_pos
+        return np.hstack([kin[:20], goal_vec]).astype(np.float32)
     return kin[:obs_dim].astype(np.float32)
 
 
@@ -105,7 +111,7 @@ def run_deployment_loop(
     # Observation FIFO buffer to maintain [To, obs_dim] history
     obs_queue = deque(maxlen=obs_horizon)
     for _ in range(obs_horizon):
-        obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos))
+        obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos, relative=True))
 
     # 2. GPU Warm-up (Compiles CUDA kernels and prevents latency spikes on step 0)
     print("[DEPLOY] Running GPU warm-up forward pass...")
@@ -164,7 +170,7 @@ def run_deployment_loop(
 
                 # Update state queue
                 current_kin = raw_obs["0"] if isinstance(raw_obs, dict) else raw_obs
-                obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos))
+                obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos, relative=True))
 
                 # Reset on crash or boundary breach
                 if terminated or truncated:
@@ -172,7 +178,7 @@ def run_deployment_loop(
                     raw_obs, info = env.reset()
                     current_kin = raw_obs["0"] if isinstance(raw_obs, dict) else raw_obs
                     for _ in range(obs_horizon):
-                        obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos))
+                        obs_queue.append(format_kin_obs(current_kin, cfg.policy.obs_dim, target_pos, relative=True))
                     break
 
                 # Enforce consistent control cadence

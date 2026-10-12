@@ -9,6 +9,7 @@ from dataset.collect_expert import (
     extract_drone_obs,
     quat_to_yaw,
     compute_camera_aligned_action,
+    get_obstacle_free_carrot,
     TrajectoryGenerator,
 )
 
@@ -78,3 +79,9 @@ class TestCollectorUtilities:
             assert bx[0] <= pts[i, 0] <= bx[1]
             assert by[0] <= pts[i, 1] <= by[1]
             assert bz[0] <= pts[i, 2] <= bz[1]
+
+    def test_get_obstacle_free_carrot_close_target(self):
+        pos = np.array([0.0, 0.0, 1.0])
+        target_pos = np.array([0.05, 0.0, 1.0])
+        carrot = get_obstacle_free_carrot(pos, target_pos, client_id=0)
+        assert np.allclose(carrot, target_pos)
