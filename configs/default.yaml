@@ -12,6 +12,7 @@ env:
   physics_hz: 240              # PyBullet physics simulation frequency
   control_hz: 20               # Diffusion inference and replanning frequency (50ms interval)
   gui: false
+  urdf_path: null              # Optional path to world/obstacle URDF (e.g. for Google Colab or Blender export)
 
 data:
   zarr_path: "data/expert_trajectories.zarr"
