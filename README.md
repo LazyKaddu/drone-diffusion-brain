@@ -127,3 +127,11 @@ The real-time control loop executing Receding Horizon Control (RHC):
 | Inference Schedule | DDIM (10 steps) | Sub-50ms deterministic sampling for real-time control |
 | Conditioning Mode | Kinematic (20-dim) or RGB ($3 \times 224 \times 224$) | Adaptive multi-modal embedding passed via FiLM layers |
 | Inference Frequency | 20 Hz | Action replanning cycle triggered every 50ms |
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on code standards, local setup, test execution, and pull request procedures.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
